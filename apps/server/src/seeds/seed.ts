@@ -1,7 +1,9 @@
 import "dotenv/config";
 import { USER_ROLES, type UserRole } from "@loanforge/shared";
 import { connectDatabase, disconnectDatabase } from "../config/database";
+import { Loan } from "../models/Loan";
 import { LoanApplication } from "../models/LoanApplication";
+import { Payment } from "../models/Payment";
 import { createUserWithRole } from "../services/auth.service";
 import { createLoanFromApplication } from "../services/loan.service";
 
@@ -28,6 +30,22 @@ const SEED_ACCOUNTS: ReadonlyArray<{
   { email: "borrower@loanforge.test", role: "borrower", name: "Borrower User" },
 ];
 
+async function resetBorrowerDemo(userId: { toString(): string }): Promise<void> {
+  const applications = await LoanApplication.find({ userId });
+  const applicationIds = applications.map((a) => a._id);
+  const loans = await Loan.find({
+    $or: [{ borrowerId: userId }, { applicationId: { $in: applicationIds } }],
+  });
+  const loanIds = loans.map((l) => l._id);
+  if (loanIds.length > 0) {
+    await Payment.deleteMany({ loanId: { $in: loanIds } });
+    await Loan.deleteMany({ _id: { $in: loanIds } });
+  }
+  if (applicationIds.length > 0) {
+    await LoanApplication.deleteMany({ _id: { $in: applicationIds } });
+  }
+}
+
 async function seedOperationsData(): Promise<void> {
   const leadUser = await createUserWithRole(
     "lead@loanforge.test",
@@ -36,9 +54,9 @@ async function seedOperationsData(): Promise<void> {
     "Lead Prospect",
   );
 
-  let leadApp = await LoanApplication.findOne({ userId: leadUser._id });
-  if (!leadApp) {
-    leadApp = await LoanApplication.create({
+  await resetBorrowerDemo(leadUser._id);
+
+  const leadApp = await LoanApplication.create({
       userId: leadUser._id,
       status: "draft",
       personalDetails: {
@@ -54,7 +72,6 @@ async function seedOperationsData(): Promise<void> {
         checkedAt: new Date().toISOString(),
       },
     });
-  }
 
   const borrower = await createUserWithRole(
     "borrower@loanforge.test",
@@ -63,43 +80,39 @@ async function seedOperationsData(): Promise<void> {
     "Borrower User",
   );
 
-  let borrowerApp = await LoanApplication.findOne({ userId: borrower._id });
-  if (!borrowerApp || borrowerApp.status !== "applied") {
-    if (borrowerApp) {
-      await LoanApplication.deleteOne({ _id: borrowerApp._id });
-    }
-    borrowerApp = await LoanApplication.create({
-      userId: borrower._id,
-      status: "applied",
-      personalDetails: {
-        fullName: "Rahul Verma",
-        dateOfBirth: "1990-03-20",
-        pan: "FGHIJ5678K",
-        employmentMode: "salaried",
-        monthlySalary: 75000,
-      },
-      bre: {
-        passed: true,
-        failures: [],
-        checkedAt: new Date().toISOString(),
-      },
-      salarySlip: {
-        originalName: "salary-slip.pdf",
-        storedPath: "seed/salary-slip.pdf",
-        mimeType: "application/pdf",
-        size: 1024,
-        uploadedAt: new Date().toISOString(),
-      },
-      loan: {
-        amount: 150000,
-        tenureDays: 180,
-        interestRate: 0.12,
-        interestAmount: 8860.27,
-        totalRepayment: 158860.27,
-      },
-    });
-    await createLoanFromApplication(borrowerApp._id.toString());
-  }
+  await resetBorrowerDemo(borrower._id);
+
+  const borrowerApp = await LoanApplication.create({
+    userId: borrower._id,
+    status: "applied",
+    personalDetails: {
+      fullName: "Rahul Verma",
+      dateOfBirth: "1990-03-20",
+      pan: "FGHIJ5678K",
+      employmentMode: "salaried",
+      monthlySalary: 75000,
+    },
+    bre: {
+      passed: true,
+      failures: [],
+      checkedAt: new Date().toISOString(),
+    },
+    salarySlip: {
+      originalName: "salary-slip.pdf",
+      storedPath: "seed/salary-slip.pdf",
+      mimeType: "application/pdf",
+      size: 1024,
+      uploadedAt: new Date().toISOString(),
+    },
+    loan: {
+      amount: 150000,
+      tenureDays: 180,
+      interestRate: 0.12,
+      interestAmount: 8860.27,
+      totalRepayment: 158860.27,
+    },
+  });
+  await createLoanFromApplication(borrowerApp._id.toString());
 
   console.log("\nOperations seed:");
   console.log(`  Sales lead: ${leadUser.email} (draft application)`);
