@@ -10,12 +10,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b --force",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
