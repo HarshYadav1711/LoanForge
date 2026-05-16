@@ -1,5 +1,5 @@
-import { ModulePage } from "@/components/dashboard/ModulePage";
+import { DisbursementPanel } from "@/components/dashboard/DisbursementPanel";
 
 export default function DisbursementDashboardPage() {
-  return <ModulePage module="disbursement" title="Disbursement" />;
+  return <DisbursementPanel />;
 }

@@ -1,5 +1,5 @@
-import { ModulePage } from "@/components/dashboard/ModulePage";
+import { SalesLeadsPanel } from "@/components/dashboard/SalesLeadsPanel";
 
 export default function SalesDashboardPage() {
-  return <ModulePage module="sales" title="Sales" />;
+  return <SalesLeadsPanel />;
 }

@@ -10,6 +10,7 @@ import {
 import { LoanApplication } from "../models/LoanApplication";
 import { AppError } from "../utils/AppError";
 import { runBreChecks } from "./bre.service";
+import { createLoanFromApplication } from "./loan.service";
 
 function resolveCurrentStep(application: {
   status: string;
@@ -226,6 +227,7 @@ export async function submitLoanApplication(
   };
   application.status = "applied";
   await application.save();
+  await createLoanFromApplication(application._id.toString());
 
   return toPublicState(application);
 }

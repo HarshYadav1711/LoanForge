@@ -1,6 +1,21 @@
 export type { UserRole, StaffRole, DashboardRole } from "./roles";
 export type { ApiSuccess, ApiError, ApiResponse } from "./api";
-export type { LoanStatus } from "./loan";
+export type {
+  LoanStatus,
+  LoanRecord,
+  SalesLead,
+  PaymentRecord,
+} from "./loan";
+export {
+  LOAN_STATUS_TRANSITIONS,
+  canTransitionLoanStatus,
+} from "./loan";
+export {
+  rejectLoanSchema,
+  recordPaymentSchema,
+  type RejectLoanInput,
+  type RecordPaymentInput,
+} from "./operations";
 export type {
   EmploymentMode,
   ApplicationStep,

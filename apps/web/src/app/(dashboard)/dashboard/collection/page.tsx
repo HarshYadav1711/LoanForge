@@ -1,5 +1,5 @@
-import { ModulePage } from "@/components/dashboard/ModulePage";
+import { CollectionPanel } from "@/components/dashboard/CollectionPanel";
 
 export default function CollectionDashboardPage() {
-  return <ModulePage module="collection" title="Collection" />;
+  return <CollectionPanel />;
 }

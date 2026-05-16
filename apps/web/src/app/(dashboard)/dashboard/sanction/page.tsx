@@ -1,5 +1,5 @@
-import { ModulePage } from "@/components/dashboard/ModulePage";
+import { SanctionPanel } from "@/components/dashboard/SanctionPanel";
 
 export default function SanctionDashboardPage() {
-  return <ModulePage module="sanction" title="Sanction" />;
+  return <SanctionPanel />;
 }
