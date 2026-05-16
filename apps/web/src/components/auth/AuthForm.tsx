@@ -8,6 +8,110 @@ type AuthFormProps = {
   mode: "login" | "register";
 };
 
+type FieldProps = {
+  email: string;
+  password: string;
+  name: string;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onNameChange: (value: string) => void;
+};
+
+function LoginFields({
+  email,
+  password,
+  onEmailChange,
+  onPasswordChange,
+}: Omit<FieldProps, "name" | "onNameChange">) {
+  return (
+    <>
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">Email</span>
+        <input
+          id="login-email"
+          name="email"
+          type="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          required
+          autoComplete="username"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        />
+      </label>
+
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">Password</span>
+        <input
+          id="login-password"
+          name="password"
+          type="password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          required
+          minLength={8}
+          autoComplete="current-password"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        />
+      </label>
+    </>
+  );
+}
+
+function RegisterFields({
+  email,
+  password,
+  name,
+  onEmailChange,
+  onPasswordChange,
+  onNameChange,
+}: FieldProps) {
+  return (
+    <>
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">Name</span>
+        <input
+          id="register-name"
+          name="name"
+          type="text"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          autoComplete="name"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        />
+      </label>
+
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">Email</span>
+        <input
+          id="register-email"
+          name="email"
+          type="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          required
+          autoComplete="email"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        />
+      </label>
+
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">Password</span>
+        <input
+          id="register-password"
+          name="password"
+          type="password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          required
+          minLength={8}
+          autoComplete="new-password"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        />
+      </label>
+    </>
+  );
+}
+
 export function AuthForm({ mode }: AuthFormProps) {
   const { login, register } = useAuth();
   const [email, setEmail] = useState("");
@@ -36,43 +140,23 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-      {mode === "register" && (
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Name</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoComplete="name"
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          />
-        </label>
+      {mode === "login" ? (
+        <LoginFields
+          email={email}
+          password={password}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+        />
+      ) : (
+        <RegisterFields
+          email={email}
+          password={password}
+          name={name}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onNameChange={setName}
+        />
       )}
-
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Email</span>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-        />
-      </label>
-
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Password</span>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={8}
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-        />
-      </label>
 
       {error && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
