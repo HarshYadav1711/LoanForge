@@ -160,21 +160,7 @@ function resolveLeadStep(application: {
   return "ready-to-submit";
 }
 
-async function syncLoansFromAppliedApplications(): Promise<void> {
-  const applications = await LoanApplication.find({ status: "applied" }).select("_id");
-  for (const application of applications) {
-    const exists = await Loan.exists({ applicationId: application._id });
-    if (!exists) {
-      await createLoanFromApplication(application._id.toString());
-    }
-  }
-}
-
 export async function listLoansByStatus(status: LoanStatus): Promise<LoanRecord[]> {
-  if (status === "applied") {
-    await syncLoansFromAppliedApplications();
-  }
-
   const loans = await Loan.find({ status }).sort({ createdAt: -1 });
   const records: LoanRecord[] = [];
 
