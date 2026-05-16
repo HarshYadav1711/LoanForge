@@ -86,7 +86,7 @@ Interest: `SI = P × R × T / 365` (rate as decimal). Total repayment = principa
 
 **Loan status flow:** `applied` → `sanctioned` | `rejected` → `disbursed` → `closed`
 
-RBAC is enforced on the API (403 for wrong role) and in Next.js middleware (route redirects). Borrowers cannot access dashboard routes.
+RBAC is enforced on the API (403 for wrong role) and in the web app via `AuthGuard` (client-side route redirects using shared `canAccessPath`). Borrowers cannot access dashboard routes.
 
 ## Environment variables
 
@@ -135,7 +135,7 @@ loanforge/
 | `npm run start` | Run production builds |
 | `npm run seed` | Reset demo users and pipeline data |
 | `npm run lint` | Type-check all workspaces |
-| `npm run test` | Shared package unit tests |
+| `npm run test` | Business-rule unit tests (shared domain logic + server BRE) |
 
 ## Demo checklist (~3–5 minutes)
 
