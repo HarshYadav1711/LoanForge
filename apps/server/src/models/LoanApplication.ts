@@ -67,7 +67,7 @@ const loanSchema = new Schema<LoanTerms>(
 
 const loanApplicationSchema = new Schema<ILoanApplication>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: { type: String, enum: ["draft", "applied"], default: "draft" },
     personalDetails: personalDetailsSchema,
     bre: breSchema,

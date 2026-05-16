@@ -19,7 +19,7 @@ function decodeTokenRole(token: string): UserRole | null {
   }
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("loanforge_token")?.value;
 
