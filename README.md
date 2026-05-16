@@ -137,22 +137,6 @@ loanforge/
 | `npm run lint` | Type-check all workspaces |
 | `npm run test` | Business-rule unit tests (shared domain logic + server BRE) |
 
-## Demo checklist (~3–5 minutes)
-
-Use this order to match the assignment evaluation flow.
-
-- [ ] **Setup** — `npm install`, copy env files, `npm run seed`, `npm run dev`, open http://localhost:3000
-- [ ] **BRE fail** — Register a new borrower; enter age &lt; 23 or salary &lt; ₹25,000 or invalid PAN or **Unemployed**; confirm BRE blocks progress
-- [ ] **BRE pass + apply** — Fix details, pass BRE, upload a slip (PDF/JPG/PNG), configure loan, submit; confirm status **applied**
-- [ ] **Sales** — Sign in as `sales@loanforge.test`; confirm `lead@loanforge.test` draft lead is listed
-- [ ] **Sanction** — Sign in as `sanction@loanforge.test`; approve the seeded `borrower@loanforge.test` loan (or the one you just applied)
-- [ ] **Disbursement** — Sign in as `disbursement@loanforge.test`; disburse the sanctioned loan
-- [ ] **Collection** — Sign in as `collection@loanforge.test`; record payment(s) with a **unique UTR** until outstanding is ₹0; confirm loan **closed**
-- [ ] **Borrower view** — Sign in as the borrower; confirm timeline reflects sanction / disbursement / closed
-- [ ] **RBAC** — As `borrower@loanforge.test`, try `/dashboard` (redirected); as `sales@loanforge.test`, try `/dashboard/sanction` (redirected)
-
-**Optional:** Sign in as `admin@loanforge.test` to open any dashboard module from `/dashboard`.
-
 ## API overview
 
 Base path: `/api`
