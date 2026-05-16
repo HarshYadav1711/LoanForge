@@ -14,9 +14,10 @@ import {
   type PaymentRecord,
   type SalesLead,
 } from "@loanforge/shared";
+import mongoose from "mongoose";
 import { Loan, type ILoan } from "../models/Loan";
 import { LoanApplication } from "../models/LoanApplication";
-import { Payment } from "../models/Payment";
+import { Payment, type IPayment } from "../models/Payment";
 import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 
@@ -52,6 +53,15 @@ function toLoanRecord(
     createdAt: loan.createdAt.toISOString(),
     updatedAt: loan.updatedAt.toISOString(),
   };
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: number }).code === 11000
+  );
 }
 
 async function loadLoanContext(loanId: string) {
@@ -298,41 +308,60 @@ export async function recordPayment(
     throw new AppError("Loan cannot be closed.", 400, "INVALID_TRANSITION");
   }
 
-  const payment = await Payment.create({
-    loanId: loan._id,
-    utr,
-    amount,
-    paymentDate,
-    recordedBy: staffUserId,
-  });
+  const session = await mongoose.startSession();
+  let payment!: IPayment;
 
-  const updatedLoan = await Loan.findOneAndUpdate(
-    {
-      _id: loanId,
-      status: "disbursed",
-      totalPaid: loan.totalPaid,
-    },
-    {
-      $set: shouldClose
-        ? {
-            totalPaid: totalRepayment,
-            status: "closed",
-            closedAt: new Date(),
-          }
-        : {
-            totalPaid: newTotalPaid,
+  try {
+    await session.withTransaction(async () => {
+      const [createdPayment] = await Payment.create(
+        [
+          {
+            loanId: loan._id,
+            utr,
+            amount,
+            paymentDate,
+            recordedBy: staffUserId,
           },
-    },
-    { new: true },
-  );
+        ],
+        { session },
+      );
+      payment = createdPayment;
 
-  if (!updatedLoan) {
-    await Payment.deleteOne({ _id: payment._id });
-    throw new AppError(
-      "Payment could not be applied. Refresh and try again.",
-      409,
-      "CONCURRENT_UPDATE",
-    );
+      const updatedLoan = await Loan.findOneAndUpdate(
+        {
+          _id: loanId,
+          status: "disbursed",
+          totalPaid: loan.totalPaid,
+        },
+        {
+          $set: shouldClose
+            ? {
+                totalPaid: totalRepayment,
+                status: "closed",
+                closedAt: new Date(),
+              }
+            : {
+                totalPaid: newTotalPaid,
+              },
+        },
+        { new: true, session },
+      );
+
+      if (!updatedLoan) {
+        throw new AppError(
+          "Payment could not be applied. Refresh and try again.",
+          409,
+          "CONCURRENT_UPDATE",
+        );
+      }
+    });
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw new AppError("A payment with this UTR already exists.", 409, "DUPLICATE_UTR");
+    }
+    throw error;
+  } finally {
+    await session.endSession();
   }
 
   const context = await loadLoanContext(loanId);
