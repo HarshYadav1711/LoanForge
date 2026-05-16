@@ -6,7 +6,7 @@ LoanForge is an internal digital lending platform for borrower self-service and 
 
 | Layer | Technology |
 | ----- | ---------- |
-| Web | Next.js 15 (App Router), TypeScript, Tailwind CSS, React Hook Form, Zod |
+| Web | Next.js 16 (App Router), TypeScript, Tailwind CSS, React Hook Form, Zod |
 | API | Node.js, Express, TypeScript, Mongoose |
 | Database | MongoDB (local) |
 | Auth | JWT + bcrypt |
