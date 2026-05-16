@@ -1,28 +1,14 @@
 import { Router } from "express";
-import { DASHBOARD_MODULES } from "@loanforge/shared";
 import * as dashboardController from "../controllers/dashboard.controller";
 import { authenticate } from "../middleware/authenticate";
 import { authorizeModule, authorizeRoles } from "../middleware/authorizeRoles";
-import { asyncHandler } from "../utils/asyncHandler";
+import { requireUser } from "../middleware/requireUser";
 
 export const dashboardRouter = Router();
 
-dashboardRouter.use(authenticate);
+dashboardRouter.use(authenticate, requireUser);
 
-dashboardRouter.get(
-  "/",
-  authorizeRoles("admin"),
-  asyncHandler(async (req, res) => {
-    res.json({
-      success: true,
-      data: {
-        message: "Admin dashboard overview",
-        modules: DASHBOARD_MODULES,
-        user: req.user,
-      },
-    });
-  }),
-);
+dashboardRouter.get("/", authorizeRoles("admin"), dashboardController.getAdminOverview);
 
 dashboardRouter.get(
   "/sales/leads",

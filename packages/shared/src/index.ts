@@ -24,9 +24,16 @@ export type {
   BreCheckResult,
   SalarySlipInfo,
   LoanTerms,
+  BorrowerLoanSummary,
   LoanApplicationState,
   RepaymentPreview,
 } from "./application";
+export {
+  MONEY_EPSILON,
+  roundMoney,
+  outstandingBalance,
+  isFullyRepaid,
+} from "./money";
 export {
   EMPLOYMENT_MODES,
   APPLICABLE_EMPLOYMENT_MODES,

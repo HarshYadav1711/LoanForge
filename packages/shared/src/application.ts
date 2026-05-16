@@ -1,3 +1,6 @@
+import type { LoanStatus } from "./loan";
+import { roundMoney } from "./money";
+
 export const EMPLOYMENT_MODES = ["salaried", "self-employed", "unemployed"] as const;
 export type EmploymentMode = (typeof EMPLOYMENT_MODES)[number];
 
@@ -59,6 +62,20 @@ export interface LoanTerms {
   totalRepayment: number;
 }
 
+/** Loan lifecycle summary exposed to the borrower after submission. */
+export interface BorrowerLoanSummary {
+  id: string;
+  status: LoanStatus;
+  rejectionReason: string | null;
+  totalRepayment: number;
+  totalPaid: number;
+  outstandingBalance: number;
+  sanctionedAt: string | null;
+  rejectedAt: string | null;
+  disbursedAt: string | null;
+  closedAt: string | null;
+}
+
 export interface LoanApplicationState {
   id: string;
   status: ApplicationStatus;
@@ -67,6 +84,7 @@ export interface LoanApplicationState {
   bre: BreCheckResult | null;
   salarySlip: SalarySlipInfo | null;
   loan: LoanTerms | null;
+  linkedLoan: BorrowerLoanSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,9 +111,8 @@ export function calculateSimpleInterestRepayment(
   tenureDays: number,
   annualRate: number = ANNUAL_INTEREST_RATE,
 ): RepaymentPreview {
-  const interestAmount =
-    Math.round(principal * annualRate * (tenureDays / 365) * 100) / 100;
-  const totalRepayment = Math.round((principal + interestAmount) * 100) / 100;
+  const interestAmount = roundMoney(principal * annualRate * (tenureDays / 365));
+  const totalRepayment = roundMoney(principal + interestAmount);
 
   return {
     principal,

@@ -14,7 +14,7 @@ import type { LoginInput, PublicUser, RegisterInput } from "@loanforge/shared";
 import { getHomePathForRole } from "@loanforge/shared";
 import * as authApi from "@/lib/auth-api";
 import { clearToken, getToken, setToken } from "@/lib/auth-storage";
-import { ApiRequestError } from "@/lib/api";
+import { ApiRequestError, setUnauthorizedHandler } from "@/lib/api";
 
 type AuthContextValue = {
   user: PublicUser | null;
@@ -54,6 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearToken();
+      setUser(null);
+    });
+  }, []);
 
   const handleAuthSuccess = useCallback(
     (authUser: PublicUser, accessToken: string) => {

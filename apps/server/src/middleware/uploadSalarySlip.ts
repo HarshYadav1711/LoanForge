@@ -12,7 +12,7 @@ const storage = multer.diskStorage({
   destination(req, _file, cb) {
     const userId = req.user?.id;
     if (!userId) {
-      cb(new Error("Unauthorized"), "");
+      cb(new AppError("Unauthorized", 401, "UNAUTHORIZED"), "");
       return;
     }
 
@@ -58,6 +58,11 @@ export function handleMulterError(
   _res: Response,
   next: NextFunction,
 ): void {
+  if (err instanceof AppError) {
+    next(err);
+    return;
+  }
+
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
       next(new AppError("Salary slip must be 5 MB or smaller.", 400, "FILE_TOO_LARGE"));

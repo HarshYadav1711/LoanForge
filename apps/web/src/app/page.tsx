@@ -2,8 +2,19 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 px-6 py-16">
-      <HomeHeader />
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 px-4 py-16 sm:px-6">
+      <header className="space-y-2">
+        <p className="text-sm font-medium uppercase tracking-wide text-brand-600">
+          LoanForge
+        </p>
+        <h1 className="text-3xl font-semibold text-slate-900">
+          Digital lending operations platform
+        </h1>
+        <p className="text-slate-600">
+          Borrowers apply online; sales, sanction, disbursement, and collection teams work
+          from a unified dashboard with full loan lifecycle tracking.
+        </p>
+      </header>
       <nav className="flex flex-col gap-3 sm:flex-row">
         <Link
           href="/login"
@@ -25,22 +36,5 @@ export default function HomePage() {
         </Link>
       </nav>
     </main>
-  );
-}
-
-function HomeHeader() {
-  return (
-    <header className="space-y-2">
-      <p className="text-sm font-medium uppercase tracking-wide text-brand-600">
-        LoanForge
-      </p>
-      <h1 className="text-3xl font-semibold text-slate-900">
-        Lending platform scaffold
-      </h1>
-      <p className="text-slate-600">
-        Monorepo ready for borrower flows, business rules, and operations
-        modules. Business features are not implemented yet.
-      </p>
-    </header>
   );
 }

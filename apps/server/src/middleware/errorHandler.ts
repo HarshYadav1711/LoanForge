@@ -20,5 +20,6 @@ export function errorHandler(
   res.status(500).json({
     success: false,
     error: "Internal server error",
+    code: "INTERNAL_ERROR",
   });
 }

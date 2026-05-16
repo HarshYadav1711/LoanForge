@@ -3,11 +3,12 @@ import { Router } from "express";
 import * as applicationController from "../controllers/application.controller";
 import { authenticate } from "../middleware/authenticate";
 import { authorizeRoles } from "../middleware/authorizeRoles";
+import { requireUser } from "../middleware/requireUser";
 import { handleMulterError, uploadSalarySlip } from "../middleware/uploadSalarySlip";
 
 export const borrowerRouter = Router();
 
-borrowerRouter.use(authenticate, authorizeRoles("borrower"));
+borrowerRouter.use(authenticate, requireUser, authorizeRoles("borrower"));
 
 function salarySlipUpload(req: Request, res: Response, next: NextFunction): void {
   uploadSalarySlip.single("salarySlip")(req, res, (err) => {

@@ -20,6 +20,7 @@
     "build:web": "npm run build -w @loanforge/web",
     "start": "concurrently -n server,web -c blue,green \"npm run start -w @loanforge/server\" \"npm run start -w @loanforge/web\"",
     "lint": "npm run lint -w @loanforge/shared && npm run lint -w @loanforge/server && npm run lint -w @loanforge/web",
+    "test": "npm run test -w @loanforge/shared",
     "seed": "npm run seed -w @loanforge/server"
   },
   "devDependencies": {

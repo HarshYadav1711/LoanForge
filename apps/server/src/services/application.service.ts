@@ -10,7 +10,7 @@ import {
 import { LoanApplication } from "../models/LoanApplication";
 import { AppError } from "../utils/AppError";
 import { runBreChecks } from "./bre.service";
-import { createLoanFromApplication } from "./loan.service";
+import { createLoanFromApplication, getBorrowerLoanSummaryForApplication } from "./loan.service";
 
 function resolveCurrentStep(application: {
   status: string;
@@ -37,21 +37,25 @@ function resolveCurrentStep(application: {
   return "complete";
 }
 
-function toPublicState(application: {
-  _id: { toString(): string };
-  status: "draft" | "applied";
-  personalDetails?: PersonalDetails;
-  bre?: LoanApplicationState["bre"];
-  salarySlip?: {
-    originalName: string;
-    mimeType: string;
-    size: number;
-    uploadedAt: string;
-  };
-  loan?: LoanApplicationState["loan"];
-  createdAt: Date;
-  updatedAt: Date;
-}): LoanApplicationState {
+async function toPublicState(
+  application: {
+    _id: { toString(): string };
+    userId: { toString(): string };
+    status: "draft" | "applied";
+    personalDetails?: PersonalDetails;
+    bre?: LoanApplicationState["bre"];
+    salarySlip?: {
+      originalName: string;
+      mimeType: string;
+      size: number;
+      uploadedAt: string;
+    };
+    loan?: LoanApplicationState["loan"];
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  borrowerId: string,
+): Promise<LoanApplicationState> {
   const salarySlip = application.salarySlip
     ? {
         originalName: application.salarySlip.originalName,
@@ -61,6 +65,11 @@ function toPublicState(application: {
       }
     : null;
 
+  const linkedLoan =
+    application.status === "applied"
+      ? await getBorrowerLoanSummaryForApplication(application._id.toString(), borrowerId)
+      : null;
+
   return {
     id: application._id.toString(),
     status: application.status,
@@ -69,6 +78,7 @@ function toPublicState(application: {
     bre: application.bre ?? null,
     salarySlip,
     loan: application.loan ?? null,
+    linkedLoan,
     createdAt: application.createdAt.toISOString(),
     updatedAt: application.updatedAt.toISOString(),
   };
@@ -84,7 +94,7 @@ async function getOrCreateDraft(userId: string) {
 
 export async function getApplicationState(userId: string): Promise<LoanApplicationState> {
   const application = await getOrCreateDraft(userId);
-  return toPublicState(application);
+  return toPublicState(application, userId);
 }
 
 export async function savePersonalDetails(
@@ -108,7 +118,7 @@ export async function savePersonalDetails(
   application.loan = undefined;
   await application.save();
 
-  return toPublicState(application);
+  return toPublicState(application, userId);
 }
 
 export async function validateBre(userId: string): Promise<LoanApplicationState> {
@@ -131,7 +141,7 @@ export async function validateBre(userId: string): Promise<LoanApplicationState>
   }
 
   await application.save();
-  return toPublicState(application);
+  return toPublicState(application, userId);
 }
 
 export async function saveSalarySlip(
@@ -171,7 +181,7 @@ export async function saveSalarySlip(
   application.loan = undefined;
   await application.save();
 
-  return toPublicState(application);
+  return toPublicState(application, userId);
 }
 
 export async function submitLoanApplication(
@@ -229,5 +239,5 @@ export async function submitLoanApplication(
   await application.save();
   await createLoanFromApplication(application._id.toString());
 
-  return toPublicState(application);
+  return toPublicState(application, userId);
 }

@@ -24,6 +24,39 @@ type FormDataRequestOptions = Omit<RequestInit, "body"> & {
   auth?: boolean;
 };
 
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler;
+}
+
+async function parseApiResponse<T>(response: Response): Promise<ApiResponse<T>> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new ApiRequestError(
+      response.ok ? "Unexpected response from server" : "Request failed",
+      response.status,
+    );
+  }
+
+  try {
+    return (await response.json()) as ApiResponse<T>;
+  } catch {
+    throw new ApiRequestError("Invalid response from server", response.status);
+  }
+}
+
+function handleFailure<T>(response: Response, payload: ApiResponse<T>): never {
+  const message = payload.success ? "Request failed" : payload.error;
+  const code = payload.success ? undefined : payload.code;
+
+  if (response.status === 401 && onUnauthorized) {
+    onUnauthorized();
+  }
+
+  throw new ApiRequestError(message, response.status, code);
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
@@ -37,23 +70,27 @@ export async function apiRequest<T>(
 
   if (auth) {
     const token = getToken();
-    if (token) {
-      requestHeaders.set("Authorization", `Bearer ${token}`);
+    if (!token) {
+      throw new ApiRequestError("Sign in required", 401, "UNAUTHORIZED");
     }
+    requestHeaders.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${env.apiUrl}${path}`, {
-    ...rest,
-    headers: requestHeaders,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${env.apiUrl}${path}`, {
+      ...rest,
+      headers: requestHeaders,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new ApiRequestError("Network error — check your connection", 0);
+  }
 
-  const payload = (await response.json()) as ApiResponse<T>;
+  const payload = await parseApiResponse<T>(response);
 
   if (!response.ok || !payload.success) {
-    const message = payload.success ? "Request failed" : payload.error;
-    const code = payload.success ? undefined : payload.code;
-    throw new ApiRequestError(message, response.status, code);
+    handleFailure(response, payload);
   }
 
   return payload.data;
@@ -69,24 +106,28 @@ export async function apiFormDataRequest<T>(
 
   if (auth) {
     const token = getToken();
-    if (token) {
-      requestHeaders.set("Authorization", `Bearer ${token}`);
+    if (!token) {
+      throw new ApiRequestError("Sign in required", 401, "UNAUTHORIZED");
     }
+    requestHeaders.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${env.apiUrl}${path}`, {
-    ...rest,
-    method: rest.method ?? "POST",
-    headers: requestHeaders,
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${env.apiUrl}${path}`, {
+      ...rest,
+      method: rest.method ?? "POST",
+      headers: requestHeaders,
+      body,
+    });
+  } catch {
+    throw new ApiRequestError("Network error — check your connection", 0);
+  }
 
-  const payload = (await response.json()) as ApiResponse<T>;
+  const payload = await parseApiResponse<T>(response);
 
   if (!response.ok || !payload.success) {
-    const message = payload.success ? "Request failed" : payload.error;
-    const code = payload.success ? undefined : payload.code;
-    throw new ApiRequestError(message, response.status, code);
+    handleFailure(response, payload);
   }
 
   return payload.data;

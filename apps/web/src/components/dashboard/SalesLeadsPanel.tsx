@@ -5,6 +5,7 @@ import type { SalesLead } from "@loanforge/shared";
 import { ApiRequestError } from "@/lib/api";
 import { fetchSalesLeads } from "@/lib/dashboard-api";
 import { formatDate, formatInr } from "@/lib/format";
+import { StepBadge } from "./StepBadge";
 import { DashboardState } from "./DashboardState";
 
 export function SalesLeadsPanel() {
@@ -54,8 +55,9 @@ export function SalesLeadsPanel() {
         isEmpty={!isLoading && !error && leads.length === 0}
         emptyTitle="No active leads"
         emptyDescription="New borrower drafts will appear here for follow-up."
+        onRetry={() => void load()}
       >
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50">
               <tr>
@@ -77,9 +79,7 @@ export function SalesLeadsPanel() {
                   </td>
                   <td className="px-4 py-3 text-slate-700">{lead.borrowerEmail}</td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium capitalize text-brand-700">
-                      {lead.currentStep.replace(/-/g, " ")}
-                    </span>
+                    <StepBadge step={lead.currentStep} />
                   </td>
                   <td className="px-4 py-3 text-slate-700">
                     {lead.monthlySalary != null ? formatInr(lead.monthlySalary) : "—"}

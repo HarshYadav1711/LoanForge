@@ -1,11 +1,22 @@
 import type { Request, Response } from "express";
+import { DASHBOARD_MODULES } from "@loanforge/shared";
 import * as loanService from "../services/loan.service";
-import { AppError } from "../utils/AppError";
 import { asyncHandler } from "../utils/asyncHandler";
 
 function paramId(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
 }
+
+export const getAdminOverview = asyncHandler(async (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      message: "Admin dashboard overview",
+      modules: DASHBOARD_MODULES,
+      user: req.user,
+    },
+  });
+});
 
 export const listSalesLeads = asyncHandler(async (_req: Request, res: Response) => {
   const data = await loanService.listSalesLeads();
@@ -43,13 +54,9 @@ export const listCollectionLoans = asyncHandler(async (_req: Request, res: Respo
 });
 
 export const recordPayment = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user) {
-    throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
-  }
-
   const data = await loanService.recordPayment(
     paramId(req.params.loanId),
-    req.user.id,
+    req.user!.id,
     req.body,
   );
   res.status(201).json({ success: true, data });

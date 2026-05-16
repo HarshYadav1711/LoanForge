@@ -98,6 +98,7 @@ export function SanctionPanel() {
         isEmpty={!isLoading && !error && loans.length === 0}
         emptyTitle="No loans awaiting sanction"
         emptyDescription="Submitted applications will appear here for credit decision."
+        onRetry={() => void load()}
       >
         <div className="space-y-3">
           {loans.map((loan) => (

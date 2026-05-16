@@ -32,6 +32,7 @@ export function CollectionPanel() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [form, setForm] = useState<PaymentForm>(emptyForm);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -52,28 +53,39 @@ export function CollectionPanel() {
     void load();
   }, [load]);
 
-  async function openPaymentForm(loanId: string) {
-    setActiveLoanId(loanId);
-    setForm(emptyForm());
+  async function openPaymentForm(loan: LoanRecord) {
+    setActiveLoanId(loan.id);
+    setForm({ ...emptyForm(), amount: String(loan.outstandingBalance) });
     setActionError(null);
+    setPaymentsError(null);
     try {
-      setPayments(await fetchLoanPayments(loanId));
-    } catch {
+      setPayments(await fetchLoanPayments(loan.id));
+    } catch (err) {
       setPayments([]);
+      setPaymentsError(
+        err instanceof ApiRequestError ? err.message : "Failed to load payment history.",
+      );
     }
   }
 
-  async function handleRecordPayment(loanId: string) {
+  async function handleRecordPayment(loan: LoanRecord) {
     const amount = Number(form.amount);
     if (!form.utr.trim() || !form.paymentDate || Number.isNaN(amount) || amount <= 0) {
       setActionError("UTR, amount, and payment date are required.");
       return;
     }
 
+    if (amount > loan.outstandingBalance + 0.01) {
+      setActionError(
+        `Amount cannot exceed outstanding balance of ${formatInr(loan.outstandingBalance)}.`,
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setActionError(null);
     try {
-      await recordPayment(loanId, {
+      await recordPayment(loan.id, {
         utr: form.utr.trim(),
         amount,
         paymentDate: form.paymentDate,
@@ -119,6 +131,7 @@ export function CollectionPanel() {
         isEmpty={!isLoading && !error && loans.length === 0}
         emptyTitle="No active collection accounts"
         emptyDescription="Disbursed loans will appear here for repayment tracking."
+        onRetry={() => void load()}
       >
         <div className="space-y-3">
           {loans.map((loan) => (
@@ -192,10 +205,21 @@ export function CollectionPanel() {
                           setForm((f) => ({ ...f, paymentDate: e.target.value }))
                         }
                         max={new Date().toISOString().slice(0, 10)}
+                        min={loan.disbursedAt?.slice(0, 10)}
                         className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     </label>
                   </div>
+
+                  <p className="text-xs text-slate-500">
+                    Outstanding: {formatInr(loan.outstandingBalance)}
+                  </p>
+
+                  {paymentsError && (
+                    <p className="text-sm text-rose-700" role="alert">
+                      {paymentsError}
+                    </p>
+                  )}
 
                   {payments.length > 0 && (
                     <div>
@@ -227,7 +251,7 @@ export function CollectionPanel() {
                     <button
                       type="button"
                       disabled={isSubmitting}
-                      onClick={() => void handleRecordPayment(loan.id)}
+                      onClick={() => void handleRecordPayment(loan)}
                       className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
                     >
                       Record payment
@@ -248,7 +272,7 @@ export function CollectionPanel() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => void openPaymentForm(loan.id)}
+                  onClick={() => void openPaymentForm(loan)}
                   className="mt-4 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
                 >
                   Record payment

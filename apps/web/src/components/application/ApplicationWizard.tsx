@@ -2,6 +2,7 @@
 
 import type { ApplicationStep, LoanApplicationState } from "@loanforge/shared";
 import { useCallback, useEffect, useState } from "react";
+import { AsyncState } from "@/components/ui/AsyncState";
 import { ApiRequestError } from "@/lib/api";
 import { getApplication } from "@/lib/borrower-api";
 import { ApplicationComplete } from "./ApplicationComplete";
@@ -63,24 +64,16 @@ export function ApplicationWizard() {
     }
   }
 
-  if (isLoading) {
-    return <p className="text-sm text-slate-600">Loading your application…</p>;
-  }
-
-  if (loadError || !application) {
+  if (isLoading || loadError || !application) {
     return (
-      <div className="space-y-3">
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
-          {loadError ?? "Unable to load application."}
-        </p>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          Retry
-        </button>
-      </div>
+      <AsyncState
+        isLoading={isLoading}
+        error={loadError ?? (!application && !isLoading ? "Unable to load application." : null)}
+        loadingMessage="Loading your application…"
+        onRetry={() => void refresh()}
+      >
+        <></>
+      </AsyncState>
     );
   }
 

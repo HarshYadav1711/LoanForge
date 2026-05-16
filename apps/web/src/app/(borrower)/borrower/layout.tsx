@@ -6,7 +6,7 @@ export default function BorrowerLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <AuthGuard>
-      <PortalShell title="Borrower portal" description="Profile, BRE, and loan application flows.">
+      <PortalShell title="Borrower portal" description="Apply for a loan and track your application status.">
         {children}
       </PortalShell>
     </AuthGuard>

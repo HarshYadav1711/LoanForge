@@ -30,11 +30,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const me = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user) {
-    throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
-  }
-
-  const user = await authService.getUserById(req.user.id);
+  const user = await authService.getUserById(req.user!.id);
   if (!user) {
     throw new AppError("User not found", 404, "USER_NOT_FOUND");
   }

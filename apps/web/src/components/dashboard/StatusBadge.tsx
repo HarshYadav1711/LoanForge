@@ -8,6 +8,14 @@ const STATUS_STYLES: Record<LoanStatus, string> = {
   closed: "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
+const STATUS_LABELS: Record<LoanStatus, string> = {
+  applied: "Applied",
+  sanctioned: "Sanctioned",
+  rejected: "Rejected",
+  disbursed: "Disbursed",
+  closed: "Closed",
+};
+
 type StatusBadgeProps = {
   status: LoanStatus | string;
 };
@@ -18,11 +26,14 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       ? STATUS_STYLES[status as LoanStatus]
       : "bg-slate-100 text-slate-700 ring-slate-200";
 
+  const label =
+    status in STATUS_LABELS ? STATUS_LABELS[status as LoanStatus] : status;
+
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${style}`}
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${style}`}
     >
-      {status}
+      {label}
     </span>
   );
 }

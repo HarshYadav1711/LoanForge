@@ -1,7 +1,11 @@
 import {
   canTransitionLoanStatus,
+  isFullyRepaid,
+  MONEY_EPSILON,
+  outstandingBalance,
   recordPaymentSchema,
   rejectLoanSchema,
+  roundMoney,
   type LoanRecord,
   type LoanStatus,
   type PaymentRecord,
@@ -13,12 +17,6 @@ import { Payment } from "../models/Payment";
 import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 
-const MONEY_EPSILON = 0.01;
-
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 function toLoanRecord(
   loan: ILoan,
   borrowerEmail: string,
@@ -27,7 +25,6 @@ function toLoanRecord(
 ): LoanRecord {
   const totalPaid = roundMoney(loan.totalPaid);
   const totalRepayment = roundMoney(loan.totalRepayment);
-  const outstandingBalance = roundMoney(Math.max(0, totalRepayment - totalPaid));
 
   return {
     id: loan._id.toString(),
@@ -43,7 +40,7 @@ function toLoanRecord(
     interestAmount: loan.interestAmount,
     totalRepayment,
     totalPaid,
-    outstandingBalance,
+    outstandingBalance: outstandingBalance(totalRepayment, totalPaid),
     rejectionReason: loan.rejectionReason ?? null,
     disbursedAt: loan.disbursedAt?.toISOString() ?? null,
     sanctionedAt: loan.sanctionedAt?.toISOString() ?? null,
@@ -89,6 +86,16 @@ function assertTransition(loan: ILoan, to: LoanStatus): void {
       "INVALID_TRANSITION",
     );
   }
+}
+
+function assertLoanStatus(loan: ILoan, expected: LoanStatus, message: string): void {
+  if (loan.status !== expected) {
+    throw new AppError(message, 400, "INVALID_LOAN_STATE");
+  }
+}
+
+function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 export async function createLoanFromApplication(applicationId: string): Promise<ILoan> {
@@ -185,6 +192,7 @@ export async function listLoansByStatus(status: LoanStatus): Promise<LoanRecord[
 
 export async function approveLoan(loanId: string): Promise<LoanRecord> {
   const { loan, borrowerEmail, applicantName, pan } = await loadLoanContext(loanId);
+  assertLoanStatus(loan, "applied", "Only applied loans can be sanctioned.");
   assertTransition(loan, "sanctioned");
 
   loan.status = "sanctioned";
@@ -204,6 +212,7 @@ export async function rejectLoan(loanId: string, input: unknown): Promise<LoanRe
   }
 
   const { loan, borrowerEmail, applicantName, pan } = await loadLoanContext(loanId);
+  assertLoanStatus(loan, "applied", "Only applied loans can be rejected.");
   assertTransition(loan, "rejected");
 
   loan.status = "rejected";
@@ -217,6 +226,7 @@ export async function rejectLoan(loanId: string, input: unknown): Promise<LoanRe
 
 export async function disburseLoan(loanId: string): Promise<LoanRecord> {
   const { loan, borrowerEmail, applicantName, pan } = await loadLoanContext(loanId);
+  assertLoanStatus(loan, "sanctioned", "Only sanctioned loans can be disbursed.");
   assertTransition(loan, "disbursed");
 
   loan.status = "disbursed";
@@ -237,7 +247,23 @@ export async function recordPayment(
     throw new AppError(message, 400, "VALIDATION_ERROR");
   }
 
-  const { loan, borrowerEmail, applicantName, pan } = await loadLoanContext(loanId);
+  const staff = await User.findById(staffUserId).select("email");
+  if (!staff) {
+    throw new AppError("Staff user not found.", 404, "USER_NOT_FOUND");
+  }
+
+  const amount = roundMoney(parsed.data.amount);
+  const utr = parsed.data.utr.toUpperCase();
+  const paymentDate = new Date(parsed.data.paymentDate);
+
+  if (paymentDate.getTime() > Date.now()) {
+    throw new AppError("Payment date cannot be in the future.", 400, "INVALID_PAYMENT_DATE");
+  }
+
+  const loan = await Loan.findById(loanId);
+  if (!loan) {
+    throw new AppError("Loan not found.", 404, "LOAN_NOT_FOUND");
+  }
 
   if (loan.status !== "disbursed") {
     throw new AppError(
@@ -247,19 +273,26 @@ export async function recordPayment(
     );
   }
 
-  const paymentDate = new Date(parsed.data.paymentDate);
-  if (paymentDate.getTime() > Date.now()) {
-    throw new AppError("Payment date cannot be in the future.", 400, "INVALID_PAYMENT_DATE");
+  if (!loan.disbursedAt) {
+    throw new AppError("Loan disbursement date is missing.", 500, "DATA_INTEGRITY");
   }
 
-  const utr = parsed.data.utr.toUpperCase();
+  if (startOfUtcDay(paymentDate) < startOfUtcDay(loan.disbursedAt)) {
+    throw new AppError(
+      "Payment date cannot be before the loan disbursement date.",
+      400,
+      "INVALID_PAYMENT_DATE",
+    );
+  }
+
   const existingUtr = await Payment.findOne({ utr });
   if (existingUtr) {
     throw new AppError("A payment with this UTR already exists.", 409, "DUPLICATE_UTR");
   }
 
-  const amount = roundMoney(parsed.data.amount);
-  const outstanding = roundMoney(loan.totalRepayment - loan.totalPaid);
+  const totalRepayment = roundMoney(loan.totalRepayment);
+  const currentPaid = roundMoney(loan.totalPaid);
+  const outstanding = outstandingBalance(totalRepayment, currentPaid);
 
   if (amount > outstanding + MONEY_EPSILON) {
     throw new AppError(
@@ -269,9 +302,11 @@ export async function recordPayment(
     );
   }
 
-  const staff = await User.findById(staffUserId).select("email");
-  if (!staff) {
-    throw new AppError("Staff user not found.", 404, "USER_NOT_FOUND");
+  const newTotalPaid = roundMoney(currentPaid + amount);
+  const shouldClose = isFullyRepaid(totalRepayment, newTotalPaid);
+
+  if (shouldClose && !canTransitionLoanStatus("disbursed", "closed")) {
+    throw new AppError("Loan cannot be closed.", 400, "INVALID_TRANSITION");
   }
 
   const payment = await Payment.create({
@@ -282,19 +317,44 @@ export async function recordPayment(
     recordedBy: staffUserId,
   });
 
-  loan.totalPaid = roundMoney(loan.totalPaid + amount);
+  const updatedLoan = await Loan.findOneAndUpdate(
+    {
+      _id: loanId,
+      status: "disbursed",
+      totalPaid: loan.totalPaid,
+    },
+    {
+      $set: shouldClose
+        ? {
+            totalPaid: totalRepayment,
+            status: "closed",
+            closedAt: new Date(),
+          }
+        : {
+            totalPaid: newTotalPaid,
+          },
+    },
+    { new: true },
+  );
 
-  if (loan.totalPaid >= loan.totalRepayment - MONEY_EPSILON) {
-    assertTransition(loan, "closed");
-    loan.status = "closed";
-    loan.closedAt = new Date();
-    loan.totalPaid = roundMoney(loan.totalRepayment);
+  if (!updatedLoan) {
+    await Payment.deleteOne({ _id: payment._id });
+    throw new AppError(
+      "Payment could not be applied. Refresh and try again.",
+      409,
+      "CONCURRENT_UPDATE",
+    );
   }
 
-  await loan.save();
+  const context = await loadLoanContext(loanId);
 
   return {
-    loan: toLoanRecord(loan, borrowerEmail, applicantName, pan),
+    loan: toLoanRecord(
+      context.loan,
+      context.borrowerEmail,
+      context.applicantName,
+      context.pan,
+    ),
     payment: {
       id: payment._id.toString(),
       loanId: loan._id.toString(),
@@ -313,6 +373,14 @@ export async function listLoanPayments(loanId: string): Promise<PaymentRecord[]>
     throw new AppError("Loan not found.", 404, "LOAN_NOT_FOUND");
   }
 
+  if (loan.status !== "disbursed" && loan.status !== "closed") {
+    throw new AppError(
+      "Payment history is only available for disbursed or closed loans.",
+      400,
+      "INVALID_LOAN_STATE",
+    );
+  }
+
   const payments = await Payment.find({ loanId }).sort({ paymentDate: -1 });
   const staffIds = [...new Set(payments.map((p) => p.recordedBy.toString()))];
   const staffUsers = await User.find({ _id: { $in: staffIds } }).select("email");
@@ -327,4 +395,30 @@ export async function listLoanPayments(loanId: string): Promise<PaymentRecord[]>
     recordedByEmail: emailById.get(payment.recordedBy.toString()) ?? "—",
     createdAt: payment.createdAt.toISOString(),
   }));
+}
+
+export async function getBorrowerLoanSummaryForApplication(
+  applicationId: string,
+  borrowerId: string,
+) {
+  const loan = await Loan.findOne({ applicationId, borrowerId });
+  if (!loan) {
+    return null;
+  }
+
+  const totalRepayment = roundMoney(loan.totalRepayment);
+  const totalPaid = roundMoney(loan.totalPaid);
+
+  return {
+    id: loan._id.toString(),
+    status: loan.status,
+    rejectionReason: loan.rejectionReason ?? null,
+    totalRepayment,
+    totalPaid,
+    outstandingBalance: outstandingBalance(totalRepayment, totalPaid),
+    sanctionedAt: loan.sanctionedAt?.toISOString() ?? null,
+    rejectedAt: loan.rejectedAt?.toISOString() ?? null,
+    disbursedAt: loan.disbursedAt?.toISOString() ?? null,
+    closedAt: loan.closedAt?.toISOString() ?? null,
+  };
 }

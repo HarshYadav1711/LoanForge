@@ -80,6 +80,7 @@ export function DisbursementPanel() {
         isEmpty={!isLoading && !error && loans.length === 0}
         emptyTitle="No loans awaiting disbursement"
         emptyDescription="Sanctioned loans will appear here for payout confirmation."
+        onRetry={() => void load()}
       >
         <div className="space-y-3">
           {loans.map((loan) => (

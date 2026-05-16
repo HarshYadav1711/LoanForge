@@ -8,7 +8,7 @@ export default function DashboardLayout({
     <AuthGuard>
       <PortalShell
         title="Operations dashboard"
-        description="Sales, sanction, disbursement, collection, and admin."
+        description="Sales, sanction, disbursement, and collection modules."
       >
         {children}
       </PortalShell>
