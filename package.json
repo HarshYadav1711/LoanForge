@@ -9,8 +9,11 @@
     "node": ">=20"
   },
   "overrides": {
-    "@types/express": "^4.17.21",
-    "@types/express-serve-static-core": "^4.19.0"
+    "@types/express": "4.17.21",
+    "@types/express-serve-static-core": "4.19.6",
+    "@types/multer": {
+      "@types/express": "4.17.21"
+    }
   },
   "scripts": {
     "predev": "npm run build:shared",
@@ -28,6 +31,8 @@
     "seed": "npm run seed -w @loanforge/server"
   },
   "devDependencies": {
+    "@types/express": "4.17.21",
+    "@types/express-serve-static-core": "4.19.6",
     "concurrently": "^9.1.2"
   }
 }

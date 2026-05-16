@@ -28,7 +28,7 @@ const storage = multer.diskStorage({
 });
 
 function fileFilter(
-  _req: Express.Request,
+  _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ): void {
