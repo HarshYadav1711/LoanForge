@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
+    "moduleResolution": "node",
     "lib": ["ES2022"],
     "outDir": "dist",
     "rootDir": "src",
@@ -12,6 +13,7 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "references": [{ "path": "../../packages/shared" }],
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }

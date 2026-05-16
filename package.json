@@ -18,7 +18,7 @@
     "dev": "concurrently -n server,web -c blue,green \"npm run dev:server\" \"npm run dev:web\"",
     "dev:server": "npm run dev -w @loanforge/server",
     "dev:web": "npm run dev -w @loanforge/web",
-    "build": "npm run build -w @loanforge/shared && npm run build -w @loanforge/server && npm run build -w @loanforge/web",
+    "build": "npm run build -w @loanforge/server && npm run build -w @loanforge/web",
     "build:shared": "npm run build -w @loanforge/shared",
     "build:server": "npm run build -w @loanforge/server",
     "build:web": "npm run build -w @loanforge/web",
