@@ -4,13 +4,23 @@ import {
   loanConfigSchema,
   personalDetailsSchema,
   type ApplicationStep,
+  type BorrowerDashboardState,
   type LoanApplicationState,
   type PersonalDetails,
 } from "@loanforge/shared";
 import { LoanApplication } from "../models/LoanApplication";
 import { AppError } from "../utils/AppError";
 import { runBreChecks } from "./bre.service";
-import { createLoanFromApplication, getBorrowerLoanSummaryForApplication } from "./loan.service";
+import {
+  createLoanFromApplication,
+  findActiveLoanForBorrower,
+  getBorrowerActiveLoan,
+  getBorrowerLoanSummaryForApplication,
+  listBorrowerLoanHistory,
+} from "./loan.service";
+
+const ACTIVE_LOAN_MESSAGE =
+  "You already have an active loan in progress. New applications are available once it is closed or rejected.";
 
 function resolveCurrentStep(application: {
   status: string;
@@ -84,16 +94,73 @@ async function toPublicState(
   };
 }
 
-async function getOrCreateDraft(userId: string) {
-  let application = await LoanApplication.findOne({ userId });
+async function assertNoActiveLoan(userId: string): Promise<void> {
+  const active = await findActiveLoanForBorrower(userId);
+  if (active) {
+    throw new AppError(ACTIVE_LOAN_MESSAGE, 400, "ACTIVE_LOAN_EXISTS");
+  }
+}
+
+async function findDraftApplication(userId: string) {
+  return LoanApplication.findOne({ userId, status: "draft" });
+}
+
+async function getDraftOrThrow(userId: string) {
+  const application = await findDraftApplication(userId);
   if (!application) {
-    application = await LoanApplication.create({ userId, status: "draft" });
+    throw new AppError(
+      "No application in progress. Start a new application from your dashboard.",
+      404,
+      "NO_DRAFT_APPLICATION",
+    );
   }
   return application;
 }
 
+export async function getBorrowerDashboard(userId: string): Promise<BorrowerDashboardState> {
+  const [activeLoan, draft, loanHistory] = await Promise.all([
+    getBorrowerActiveLoan(userId),
+    findDraftApplication(userId),
+    listBorrowerLoanHistory(userId),
+  ]);
+
+  const canStartNewApplication = !activeLoan && !draft;
+  const blockReason = activeLoan ? ACTIVE_LOAN_MESSAGE : null;
+
+  return {
+    canStartNewApplication,
+    blockReason,
+    activeLoan,
+    draftApplication: draft
+      ? {
+          id: draft._id.toString(),
+          currentStep: resolveCurrentStep(draft),
+          updatedAt: draft.updatedAt.toISOString(),
+        }
+      : null,
+    loanHistory,
+  };
+}
+
+export async function startNewApplication(userId: string): Promise<LoanApplicationState> {
+  await assertNoActiveLoan(userId);
+
+  const existingDraft = await findDraftApplication(userId);
+  if (existingDraft) {
+    return toPublicState(existingDraft, userId);
+  }
+
+  const application = await LoanApplication.create({ userId, status: "draft" });
+  return toPublicState(application, userId);
+}
+
 export async function getApplicationState(userId: string): Promise<LoanApplicationState> {
-  const application = await getOrCreateDraft(userId);
+  const active = await findActiveLoanForBorrower(userId);
+  if (active) {
+    throw new AppError(ACTIVE_LOAN_MESSAGE, 400, "ACTIVE_LOAN_EXISTS");
+  }
+
+  const application = await getDraftOrThrow(userId);
   return toPublicState(application, userId);
 }
 
@@ -107,10 +174,7 @@ export async function savePersonalDetails(
     throw new AppError(message, 400, "VALIDATION_ERROR");
   }
 
-  const application = await getOrCreateDraft(userId);
-  if (application.status === "applied") {
-    throw new AppError("Application has already been submitted.", 400, "APPLICATION_LOCKED");
-  }
+  const application = await getDraftOrThrow(userId);
 
   application.personalDetails = parsed.data;
   application.bre = undefined;
@@ -122,11 +186,7 @@ export async function savePersonalDetails(
 }
 
 export async function validateBre(userId: string): Promise<LoanApplicationState> {
-  const application = await getOrCreateDraft(userId);
-
-  if (application.status === "applied") {
-    throw new AppError("Application has already been submitted.", 400, "APPLICATION_LOCKED");
-  }
+  const application = await getDraftOrThrow(userId);
 
   if (!application.personalDetails) {
     throw new AppError("Complete personal details before BRE validation.", 400, "STEP_INCOMPLETE");
@@ -153,11 +213,7 @@ export async function saveSalarySlip(
     size: number;
   },
 ): Promise<LoanApplicationState> {
-  const application = await getOrCreateDraft(userId);
-
-  if (application.status === "applied") {
-    throw new AppError("Application has already been submitted.", 400, "APPLICATION_LOCKED");
-  }
+  const application = await getDraftOrThrow(userId);
 
   if (!application.personalDetails) {
     throw new AppError("Complete personal details first.", 400, "STEP_INCOMPLETE");
@@ -194,11 +250,9 @@ export async function submitLoanApplication(
     throw new AppError(message, 400, "VALIDATION_ERROR");
   }
 
-  const application = await getOrCreateDraft(userId);
+  await assertNoActiveLoan(userId);
 
-  if (application.status === "applied") {
-    throw new AppError("Application has already been submitted.", 400, "APPLICATION_LOCKED");
-  }
+  const application = await getDraftOrThrow(userId);
 
   if (!application.personalDetails) {
     throw new AppError("Complete personal details first.", 400, "STEP_INCOMPLETE");

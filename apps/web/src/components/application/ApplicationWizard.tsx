@@ -4,6 +4,7 @@ import type { ApplicationStep, LoanApplicationState } from "@loanforge/shared";
 import { useCallback, useEffect, useState } from "react";
 import { AsyncState } from "@/components/ui/AsyncState";
 import { ApiRequestError } from "@/lib/api";
+import { ApplicationBlocked } from "@/components/borrower/ApplicationBlocked";
 import { getApplication } from "@/lib/borrower-api";
 import { ApplicationComplete } from "./ApplicationComplete";
 import { BreValidationStep } from "./BreValidationStep";
@@ -33,16 +34,34 @@ export function ApplicationWizard() {
   const [application, setApplication] = useState<LoanApplicationState | null>(null);
   const [activeStep, setActiveStep] = useState<ApplicationStep>("personal");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<{ title: string; message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoadError(null);
+    setBlocked(null);
     setIsLoading(true);
     try {
       const state = await getApplication();
       setApplication(state);
       setActiveStep(state.currentStep === "complete" ? "complete" : state.currentStep);
     } catch (err) {
+      if (err instanceof ApiRequestError) {
+        if (err.code === "ACTIVE_LOAN_EXISTS") {
+          setBlocked({
+            title: "Active loan in progress",
+            message: err.message,
+          });
+          return;
+        }
+        if (err.code === "NO_DRAFT_APPLICATION") {
+          setBlocked({
+            title: "No application in progress",
+            message: err.message,
+          });
+          return;
+        }
+      }
       setLoadError(err instanceof ApiRequestError ? err.message : "Failed to load application.");
     } finally {
       setIsLoading(false);
@@ -62,6 +81,10 @@ export function ApplicationWizard() {
         setActiveStep(updated.currentStep);
       }
     }
+  }
+
+  if (blocked) {
+    return <ApplicationBlocked title={blocked.title} message={blocked.message} />;
   }
 
   if (isLoading || loadError || !application) {

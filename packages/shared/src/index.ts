@@ -7,9 +7,12 @@ export type {
   PaymentRecord,
 } from "./loan";
 export {
+  ACTIVE_LOAN_STATUSES,
   LOAN_STATUS_TRANSITIONS,
   canTransitionLoanStatus,
+  isActiveLoanStatus,
 } from "./loan";
+export type { ActiveLoanStatus } from "./loan";
 export {
   rejectLoanSchema,
   recordPaymentSchema,
@@ -25,6 +28,9 @@ export type {
   SalarySlipInfo,
   LoanTerms,
   BorrowerLoanSummary,
+  BorrowerLoanHistoryItem,
+  BorrowerDraftSummary,
+  BorrowerDashboardState,
   LoanApplicationState,
   RepaymentPreview,
 } from "./application";

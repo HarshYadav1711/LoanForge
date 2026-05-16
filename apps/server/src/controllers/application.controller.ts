@@ -3,6 +3,16 @@ import * as applicationService from "../services/application.service";
 import { AppError } from "../utils/AppError";
 import { asyncHandler } from "../utils/asyncHandler";
 
+export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
+  const data = await applicationService.getBorrowerDashboard(req.user!.id);
+  res.json({ success: true, data });
+});
+
+export const startApplication = asyncHandler(async (req: Request, res: Response) => {
+  const data = await applicationService.startNewApplication(req.user!.id);
+  res.status(201).json({ success: true, data });
+});
+
 export const getApplication = asyncHandler(async (req: Request, res: Response) => {
   const data = await applicationService.getApplicationState(req.user!.id);
   res.json({ success: true, data });

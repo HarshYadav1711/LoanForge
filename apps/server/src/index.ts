@@ -11,8 +11,18 @@ async function bootstrap(): Promise<void> {
 
   const app = createApp();
 
-  app.listen(env.port, () => {
+  const server = app.listen(env.port, () => {
     console.log(`LoanForge API listening on http://localhost:${env.port}`);
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `Port ${env.port} is already in use. Stop the other process (e.g. an old API server) or set PORT to a different value in apps/server/.env`,
+      );
+      process.exit(1);
+    }
+    throw err;
   });
 }
 

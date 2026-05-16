@@ -1,4 +1,5 @@
 import {
+  ACTIVE_LOAN_STATUSES,
   canTransitionLoanStatus,
   isFullyRepaid,
   MONEY_EPSILON,
@@ -6,6 +7,8 @@ import {
   recordPaymentSchema,
   rejectLoanSchema,
   roundMoney,
+  type BorrowerLoanHistoryItem,
+  type BorrowerLoanSummary,
   type LoanRecord,
   type LoanStatus,
   type PaymentRecord,
@@ -397,20 +400,15 @@ export async function listLoanPayments(loanId: string): Promise<PaymentRecord[]>
   }));
 }
 
-export async function getBorrowerLoanSummaryForApplication(
-  applicationId: string,
-  borrowerId: string,
-) {
-  const loan = await Loan.findOne({ applicationId, borrowerId });
-  if (!loan) {
-    return null;
-  }
-
+function toBorrowerLoanSummary(loan: ILoan): BorrowerLoanSummary {
   const totalRepayment = roundMoney(loan.totalRepayment);
   const totalPaid = roundMoney(loan.totalPaid);
 
   return {
     id: loan._id.toString(),
+    applicationId: loan.applicationId.toString(),
+    amount: loan.amount,
+    tenureDays: loan.tenureDays,
     status: loan.status,
     rejectionReason: loan.rejectionReason ?? null,
     totalRepayment,
@@ -420,5 +418,55 @@ export async function getBorrowerLoanSummaryForApplication(
     rejectedAt: loan.rejectedAt?.toISOString() ?? null,
     disbursedAt: loan.disbursedAt?.toISOString() ?? null,
     closedAt: loan.closedAt?.toISOString() ?? null,
+    createdAt: loan.createdAt.toISOString(),
   };
+}
+
+export async function findActiveLoanForBorrower(borrowerId: string): Promise<ILoan | null> {
+  return Loan.findOne({
+    borrowerId,
+    status: { $in: ACTIVE_LOAN_STATUSES },
+  }).sort({ createdAt: -1 });
+}
+
+export async function getBorrowerActiveLoan(
+  borrowerId: string,
+): Promise<BorrowerLoanSummary | null> {
+  const loan = await findActiveLoanForBorrower(borrowerId);
+  return loan ? toBorrowerLoanSummary(loan) : null;
+}
+
+export async function listBorrowerLoanHistory(
+  borrowerId: string,
+): Promise<BorrowerLoanHistoryItem[]> {
+  const loans = await Loan.find({
+    borrowerId,
+    status: { $in: ["rejected", "closed"] },
+  }).sort({ updatedAt: -1 });
+
+  return loans.map((loan) => {
+    const summary = toBorrowerLoanSummary(loan);
+    return {
+      id: summary.id,
+      applicationId: summary.applicationId,
+      amount: summary.amount,
+      tenureDays: summary.tenureDays,
+      status: summary.status,
+      totalRepayment: summary.totalRepayment,
+      totalPaid: summary.totalPaid,
+      outstandingBalance: summary.outstandingBalance,
+      rejectionReason: summary.rejectionReason,
+      submittedAt: summary.createdAt,
+      rejectedAt: summary.rejectedAt,
+      closedAt: summary.closedAt,
+    };
+  });
+}
+
+export async function getBorrowerLoanSummaryForApplication(
+  applicationId: string,
+  borrowerId: string,
+): Promise<BorrowerLoanSummary | null> {
+  const loan = await Loan.findOne({ applicationId, borrowerId });
+  return loan ? toBorrowerLoanSummary(loan) : null;
 }

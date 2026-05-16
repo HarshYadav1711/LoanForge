@@ -173,6 +173,7 @@ All dashboard and borrower routes require `Authorization: Bearer <accessToken>` 
 | `Missing required environment variable` | Copy `.env.example` files and set `MONGODB_URI` + `JWT_SECRET` |
 | MongoDB connection failed | Start MongoDB locally; confirm `MONGODB_URI` |
 | Empty sanction queue after testing | Run `npm run seed` again to reset demo loans |
+| **Internal server error** on loan submit | Restart the API (`npm run dev`) — stale DB indexes from an older schema are removed on startup |
 | CORS errors | Set `CLIENT_URL` to your web origin (default `http://localhost:3000`) |
 | Payment rejected for date | Use today’s date (not future); payment cannot be before disbursement |
 

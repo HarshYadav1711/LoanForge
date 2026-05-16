@@ -65,6 +65,9 @@ export interface LoanTerms {
 /** Loan lifecycle summary exposed to the borrower after submission. */
 export interface BorrowerLoanSummary {
   id: string;
+  applicationId: string;
+  amount: number;
+  tenureDays: number;
   status: LoanStatus;
   rejectionReason: string | null;
   totalRepayment: number;
@@ -74,6 +77,37 @@ export interface BorrowerLoanSummary {
   rejectedAt: string | null;
   disbursedAt: string | null;
   closedAt: string | null;
+  createdAt: string;
+}
+
+/** Closed or rejected loans shown in borrower history. */
+export interface BorrowerLoanHistoryItem {
+  id: string;
+  applicationId: string;
+  amount: number;
+  tenureDays: number;
+  status: LoanStatus;
+  totalRepayment: number;
+  totalPaid: number;
+  outstandingBalance: number;
+  rejectionReason: string | null;
+  submittedAt: string;
+  rejectedAt: string | null;
+  closedAt: string | null;
+}
+
+export interface BorrowerDraftSummary {
+  id: string;
+  currentStep: ApplicationStep;
+  updatedAt: string;
+}
+
+export interface BorrowerDashboardState {
+  canStartNewApplication: boolean;
+  blockReason: string | null;
+  activeLoan: BorrowerLoanSummary | null;
+  draftApplication: BorrowerDraftSummary | null;
+  loanHistory: BorrowerLoanHistoryItem[];
 }
 
 export interface LoanApplicationState {

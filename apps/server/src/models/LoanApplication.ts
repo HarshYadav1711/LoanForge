@@ -67,7 +67,7 @@ const loanSchema = new Schema<LoanTerms>(
 
 const loanApplicationSchema = new Schema<ILoanApplication>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     status: { type: String, enum: ["draft", "applied"], default: "draft" },
     personalDetails: personalDetailsSchema,
     bre: breSchema,
@@ -76,6 +76,12 @@ const loanApplicationSchema = new Schema<ILoanApplication>(
   },
   { timestamps: true },
 );
+
+loanApplicationSchema.index(
+  { userId: 1 },
+  { unique: true, partialFilterExpression: { status: "draft" } },
+);
+loanApplicationSchema.index({ userId: 1, status: 1, updatedAt: -1 });
 
 export const LoanApplication = model<ILoanApplication>(
   "LoanApplication",

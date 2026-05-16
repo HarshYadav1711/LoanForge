@@ -20,6 +20,8 @@ function salarySlipUpload(req: Request, res: Response, next: NextFunction): void
   });
 }
 
+borrowerRouter.get("/dashboard", applicationController.getDashboard);
+borrowerRouter.post("/application/start", applicationController.startApplication);
 borrowerRouter.get("/application", applicationController.getApplication);
 borrowerRouter.put("/application/personal", applicationController.savePersonalDetails);
 borrowerRouter.post("/application/bre", applicationController.validateBre);

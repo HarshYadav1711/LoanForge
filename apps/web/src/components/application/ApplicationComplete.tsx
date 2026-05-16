@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { LoanApplicationState } from "@loanforge/shared";
 import { LoanTimeline } from "@/components/loan/LoanTimeline";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
@@ -74,6 +75,14 @@ export function ApplicationComplete({ application }: ApplicationCompleteProps) {
           </div>
         </section>
       )}
+
+      <Link
+        href="/borrower"
+        className="inline-flex rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        Back to dashboard
+      </Link>
     </div>
   );
 }
+

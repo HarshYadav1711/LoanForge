@@ -5,6 +5,15 @@ export type LoanStatus =
   | "disbursed"
   | "closed";
 
+/** Loan statuses that block starting a new application. */
+export const ACTIVE_LOAN_STATUSES = ["applied", "sanctioned", "disbursed"] as const;
+
+export type ActiveLoanStatus = (typeof ACTIVE_LOAN_STATUSES)[number];
+
+export function isActiveLoanStatus(status: LoanStatus): status is ActiveLoanStatus {
+  return (ACTIVE_LOAN_STATUSES as readonly string[]).includes(status);
+}
+
 export const LOAN_STATUS_TRANSITIONS: Record<
   LoanStatus,
   readonly LoanStatus[]
