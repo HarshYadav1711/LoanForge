@@ -1,10 +1,24 @@
 import mongoose from "mongoose";
 import { env } from "./env";
 
+async function collectionExists(collectionName: string): Promise<boolean> {
+  const db = mongoose.connection.db;
+  if (!db) {
+    throw new Error("MongoDB connection is not established.");
+  }
+
+  const collections = await db.listCollections({ name: collectionName }).toArray();
+  return collections.length > 0;
+}
+
 async function dropStaleIndexes(
   collectionName: string,
   indexNames: readonly string[],
 ): Promise<void> {
+  if (!(await collectionExists(collectionName))) {
+    return;
+  }
+
   const collection = mongoose.connection.collection(collectionName);
   const indexes = await collection.indexes();
 
