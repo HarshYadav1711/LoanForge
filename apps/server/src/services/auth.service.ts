@@ -129,26 +129,74 @@ export async function getUserById(id: string): Promise<PublicUser | null> {
   return toPublicUser(user);
 }
 
+export type SeedUserUpsertResult = "created" | "updated" | "skipped";
+
+/**
+ * Idempotent seed upsert using the same persistence path as registration (create/save).
+ * findOneAndUpdate is not used because passwordHash has select:false and may not persist.
+ */
+export async function upsertSeedUser(
+  email: string,
+  password: string,
+  role: IUser["role"],
+  name: string,
+): Promise<SeedUserUpsertResult> {
+  validateEmail(email);
+  validatePassword(password);
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await User.findOne({ email: normalizedEmail }).select("+passwordHash");
+
+  if (existing) {
+    const passwordMatches = await comparePassword(password, existing.passwordHash);
+    const unchanged =
+      passwordMatches && existing.role === role && existing.name === name;
+
+    if (unchanged) {
+      return "skipped";
+    }
+
+    existing.passwordHash = await hashPassword(password);
+    existing.role = role;
+    existing.name = name;
+    await existing.save();
+    return "updated";
+  }
+
+  const passwordHash = await hashPassword(password);
+  await User.create({
+    email: normalizedEmail,
+    passwordHash,
+    role,
+    name,
+  });
+  return "created";
+}
+
+/** Confirms a stored hash matches the plaintext (used by seed verification). */
+export async function verifyStoredCredentials(
+  email: string,
+  password: string,
+): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail }).select("+passwordHash");
+  if (!user) {
+    return false;
+  }
+  return comparePassword(password, user.passwordHash);
+}
+
 export async function createUserWithRole(
   email: string,
   password: string,
   role: IUser["role"],
   name?: string,
 ): Promise<IUser> {
-  validateEmail(email);
-  validatePassword(password);
-
+  const result = await upsertSeedUser(email, password, role, name ?? email);
   const normalizedEmail = email.trim().toLowerCase();
-  const existing = await User.findOne({ email: normalizedEmail });
-  if (existing) {
-    return existing;
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    throw new Error(`Failed to upsert user ${normalizedEmail} (${result})`);
   }
-
-  const passwordHash = await hashPassword(password);
-  return User.create({
-    email: normalizedEmail,
-    passwordHash,
-    role,
-    ...(name ? { name } : {}),
-  });
+  return user;
 }

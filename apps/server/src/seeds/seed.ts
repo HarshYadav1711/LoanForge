@@ -1,12 +1,17 @@
 import "dotenv/config";
 import mongoose from "mongoose";
-import { USER_ROLES, type UserRole } from "@loanforge/shared";
+import { STAFF_ROLES, USER_ROLES, type UserRole } from "@loanforge/shared";
 import { connectDatabase, disconnectDatabase } from "../config/database";
 import { Loan } from "../models/Loan";
 import { LoanApplication } from "../models/LoanApplication";
 import { Payment } from "../models/Payment";
 import { User } from "../models/User";
-import { hashPassword } from "../services/auth.service";
+import {
+  login,
+  upsertSeedUser,
+  verifyStoredCredentials,
+  type SeedUserUpsertResult,
+} from "../services/auth.service";
 import { createLoanFromApplication } from "../services/loan.service";
 
 const SEED_PASSWORD = "Password1!";
@@ -32,20 +37,17 @@ const SEED_ACCOUNTS: ReadonlyArray<{
   { email: "borrower@loanforge.test", role: "borrower", name: "Borrower User" },
 ];
 
-/** Upsert seed user and always reset password (safe to re-run). */
-async function ensureSeedUser(account: {
+const EXTRA_SEED_ACCOUNTS: ReadonlyArray<{
   email: string;
   role: UserRole;
   name: string;
-}): Promise<void> {
-  const email = account.email.trim().toLowerCase();
-  const passwordHash = await hashPassword(SEED_PASSWORD);
+}> = [
+  { email: "lead@loanforge.test", role: "borrower", name: "Lead Prospect" },
+];
 
-  await User.findOneAndUpdate(
-    { email },
-    { email, passwordHash, role: account.role, name: account.name },
-    { upsert: true },
-  );
+function logUpsert(email: string, role: UserRole, result: SeedUserUpsertResult): void {
+  const label = result.toUpperCase().padEnd(7);
+  console.log(`  [${label}] ${role.padEnd(14)} ${email}`);
 }
 
 async function resetBorrowerDemo(userId: { toString(): string }): Promise<void> {
@@ -65,11 +67,14 @@ async function resetBorrowerDemo(userId: { toString(): string }): Promise<void> 
 }
 
 async function seedOperationsData(): Promise<void> {
-  await ensureSeedUser({
-    email: "lead@loanforge.test",
-    role: "borrower",
-    name: "Lead Prospect",
-  });
+  console.log("\nSeeding demo loan data...\n");
+
+  await upsertSeedUser(
+    "lead@loanforge.test",
+    SEED_PASSWORD,
+    "borrower",
+    "Lead Prospect",
+  );
   const leadUser = await User.findOne({ email: "lead@loanforge.test" });
   if (!leadUser) {
     throw new Error("Failed to create lead@loanforge.test");
@@ -78,27 +83,28 @@ async function seedOperationsData(): Promise<void> {
   await resetBorrowerDemo(leadUser._id);
 
   const leadApp = await LoanApplication.create({
-      userId: leadUser._id,
-      status: "draft",
-      personalDetails: {
-        fullName: "Priya Sharma",
-        dateOfBirth: "1992-06-15",
-        pan: "ABCDE1234F",
-        employmentMode: "salaried",
-        monthlySalary: 45000,
-      },
-      bre: {
-        passed: true,
-        failures: [],
-        checkedAt: new Date().toISOString(),
-      },
-    });
-
-  await ensureSeedUser({
-    email: "borrower@loanforge.test",
-    role: "borrower",
-    name: "Borrower User",
+    userId: leadUser._id,
+    status: "draft",
+    personalDetails: {
+      fullName: "Priya Sharma",
+      dateOfBirth: "1992-06-15",
+      pan: "ABCDE1234F",
+      employmentMode: "salaried",
+      monthlySalary: 45000,
+    },
+    bre: {
+      passed: true,
+      failures: [],
+      checkedAt: new Date().toISOString(),
+    },
   });
+
+  await upsertSeedUser(
+    "borrower@loanforge.test",
+    SEED_PASSWORD,
+    "borrower",
+    "Borrower User",
+  );
   const borrower = await User.findOne({ email: "borrower@loanforge.test" });
   if (!borrower) {
     throw new Error("Failed to create borrower@loanforge.test");
@@ -138,9 +144,62 @@ async function seedOperationsData(): Promise<void> {
   });
   await createLoanFromApplication(borrowerApp._id.toString());
 
-  console.log("\nOperations seed:");
-  console.log(`  Sales lead: ${leadUser.email} (draft application)`);
-  console.log(`  Sanction queue: ${borrower.email} (applied loan)`);
+  console.log(`  Demo lead: ${leadUser.email} (draft application)`);
+  console.log(`  Demo borrower loan: ${borrower.email} (applied)`);
+}
+
+async function verifySeedAccounts(
+  accounts: ReadonlyArray<{ email: string; role: UserRole }>,
+): Promise<void> {
+  console.log("\nVerifying stored credentials (bcrypt)...\n");
+
+  for (const account of accounts) {
+    const user = await User.findOne({ email: account.email });
+    if (!user) {
+      throw new Error(`Missing user in database: ${account.email}`);
+    }
+    if (user.role !== account.role) {
+      throw new Error(
+        `Role mismatch for ${account.email}: expected ${account.role}, got ${user.role}`,
+      );
+    }
+
+    const hashOk = await verifyStoredCredentials(account.email, SEED_PASSWORD);
+    if (!hashOk) {
+      throw new Error(`Password hash verification failed for ${account.email}`);
+    }
+
+    console.log(`  OK  ${account.role.padEnd(14)} ${account.email}`);
+  }
+}
+
+async function verifyLoginFlow(): Promise<void> {
+  console.log("\nVerifying login() for operational accounts...\n");
+
+  for (const role of STAFF_ROLES) {
+    const account = SEED_ACCOUNTS.find((a) => a.role === role);
+    if (!account) continue;
+
+    const response = await login({ email: account.email, password: SEED_PASSWORD });
+    if (response.user.role !== role) {
+      throw new Error(`login() returned wrong role for ${account.email}`);
+    }
+    console.log(`  OK  login ${account.email} → role ${response.user.role}`);
+  }
+}
+
+async function printDatabaseSummary(): Promise<void> {
+  const users = await User.find().sort({ role: 1, email: 1 }).select("email role");
+  const operational = users.filter((u) =>
+    (STAFF_ROLES as readonly string[]).includes(u.role),
+  );
+
+  console.log("\nMongoDB users summary:");
+  console.log(`  Total users: ${users.length}`);
+  console.log(`  Operational (staff): ${operational.length}`);
+  for (const user of operational) {
+    console.log(`    - ${user.role.padEnd(14)} ${user.email}`);
+  }
 }
 
 async function seed(): Promise<void> {
@@ -160,16 +219,24 @@ async function seed(): Promise<void> {
     const account = SEED_ACCOUNTS.find((a) => a.role === role);
     if (!account) continue;
 
-    await ensureSeedUser(account);
-    console.log(`  ${role.padEnd(14)} ${account.email}`);
+    const result = await upsertSeedUser(
+      account.email,
+      SEED_PASSWORD,
+      account.role,
+      account.name,
+    );
+    logUpsert(account.email, account.role, result);
   }
 
   await seedOperationsData();
 
+  const allAccounts = [...SEED_ACCOUNTS, ...EXTRA_SEED_ACCOUNTS];
+  await verifySeedAccounts(allAccounts);
+  await verifyLoginFlow();
+  await printDatabaseSummary();
+
   console.log(`\nPassword for all seed accounts: ${SEED_PASSWORD}`);
   console.log("Seed complete.");
-
-  await disconnectDatabase();
 }
 
 seed().catch((err) => {
