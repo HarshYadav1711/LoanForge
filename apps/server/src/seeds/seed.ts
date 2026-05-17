@@ -147,5 +147,10 @@ async function seed(): Promise<void> {
 
 seed().catch((err) => {
   console.error("Seed failed:", err);
+  if (err && typeof err === "object" && "code" in err && err.code === "ECONNREFUSED") {
+    console.error(
+      "\nCould not reach MongoDB. Check Atlas cluster is running, Network Access allows your IP (or 0.0.0.0/0), and try a standard (non-SRV) connection string from Atlas if this persists.",
+    );
+  }
   process.exit(1);
 });

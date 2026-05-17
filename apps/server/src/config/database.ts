@@ -31,12 +31,17 @@ async function dropStaleIndexes(
 
 /** Indexes left from an older schema can break inserts (e.g. unique on a removed field). */
 async function migrateStaleIndexes(): Promise<void> {
+  await dropStaleIndexes("users", ["phone_1"]);
   await dropStaleIndexes("loans", ["applicationNumber_1"]);
   await dropStaleIndexes("loanapplications", ["userId_1"]);
 }
 
 export async function connectDatabase(): Promise<void> {
-  await mongoose.connect(env.mongodbUri);
+  await mongoose.connect(env.mongodbUri, {
+    // Prefer IPv4 — avoids querySrv ECONNREFUSED on some Windows/VPN DNS setups.
+    family: 4,
+    serverSelectionTimeoutMS: 15_000,
+  });
   await migrateStaleIndexes();
 }
 

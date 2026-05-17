@@ -160,6 +160,8 @@ All dashboard and borrower routes require `Authorization: Bearer <accessToken>` 
 | **Internal server error** on loan submit | Restart the API (`npm run dev`) — stale DB indexes from an older schema are removed on startup |
 | CORS errors | Set `CLIENT_URL` to your web origin (default `http://localhost:3000`) |
 | Payment rejected for date | Use today’s date (not future); payment cannot be before disbursement |
+| `querySrv ECONNREFUSED` when seeding Atlas | Use single-quoted env vars in PowerShell (see below); allow your IP in Atlas → Network Access; ensure cluster is not paused |
+| Seed/login fails on production | Run `npm run seed` against the **same** `MONGODB_URI` as the deployed API |
 
 ## License
 
