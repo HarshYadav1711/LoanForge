@@ -1,10 +1,12 @@
 import "dotenv/config";
+import mongoose from "mongoose";
 import { USER_ROLES, type UserRole } from "@loanforge/shared";
 import { connectDatabase, disconnectDatabase } from "../config/database";
 import { Loan } from "../models/Loan";
 import { LoanApplication } from "../models/LoanApplication";
 import { Payment } from "../models/Payment";
-import { createUserWithRole } from "../services/auth.service";
+import { User } from "../models/User";
+import { hashPassword } from "../services/auth.service";
 import { createLoanFromApplication } from "../services/loan.service";
 
 const SEED_PASSWORD = "Password1!";
@@ -30,6 +32,22 @@ const SEED_ACCOUNTS: ReadonlyArray<{
   { email: "borrower@loanforge.test", role: "borrower", name: "Borrower User" },
 ];
 
+/** Upsert seed user and always reset password (safe to re-run). */
+async function ensureSeedUser(account: {
+  email: string;
+  role: UserRole;
+  name: string;
+}): Promise<void> {
+  const email = account.email.trim().toLowerCase();
+  const passwordHash = await hashPassword(SEED_PASSWORD);
+
+  await User.findOneAndUpdate(
+    { email },
+    { email, passwordHash, role: account.role, name: account.name },
+    { upsert: true },
+  );
+}
+
 async function resetBorrowerDemo(userId: { toString(): string }): Promise<void> {
   const applications = await LoanApplication.find({ userId });
   const applicationIds = applications.map((a) => a._id);
@@ -47,12 +65,15 @@ async function resetBorrowerDemo(userId: { toString(): string }): Promise<void> 
 }
 
 async function seedOperationsData(): Promise<void> {
-  const leadUser = await createUserWithRole(
-    "lead@loanforge.test",
-    SEED_PASSWORD,
-    "borrower",
-    "Lead Prospect",
-  );
+  await ensureSeedUser({
+    email: "lead@loanforge.test",
+    role: "borrower",
+    name: "Lead Prospect",
+  });
+  const leadUser = await User.findOne({ email: "lead@loanforge.test" });
+  if (!leadUser) {
+    throw new Error("Failed to create lead@loanforge.test");
+  }
 
   await resetBorrowerDemo(leadUser._id);
 
@@ -73,12 +94,15 @@ async function seedOperationsData(): Promise<void> {
       },
     });
 
-  const borrower = await createUserWithRole(
-    "borrower@loanforge.test",
-    SEED_PASSWORD,
-    "borrower",
-    "Borrower User",
-  );
+  await ensureSeedUser({
+    email: "borrower@loanforge.test",
+    role: "borrower",
+    name: "Borrower User",
+  });
+  const borrower = await User.findOne({ email: "borrower@loanforge.test" });
+  if (!borrower) {
+    throw new Error("Failed to create borrower@loanforge.test");
+  }
 
   await resetBorrowerDemo(borrower._id);
 
@@ -122,18 +146,21 @@ async function seedOperationsData(): Promise<void> {
 async function seed(): Promise<void> {
   await connectDatabase();
 
-  console.log("Seeding users (one per role)...\n");
+  const dbName = mongoose.connection.db?.databaseName ?? "(unknown)";
+  console.log(`Connected to MongoDB database: ${dbName}`);
+  if (dbName !== "loanforge") {
+    console.warn(
+      "  Warning: expected database name 'loanforge'. Check MONGODB_URI includes /loanforge before the query string.",
+    );
+  }
+
+  console.log("\nSeeding users (one per role)...\n");
 
   for (const role of USER_ROLES) {
     const account = SEED_ACCOUNTS.find((a) => a.role === role);
     if (!account) continue;
 
-    await createUserWithRole(
-      account.email,
-      SEED_PASSWORD,
-      account.role,
-      account.name,
-    );
+    await ensureSeedUser(account);
     console.log(`  ${role.padEnd(14)} ${account.email}`);
   }
 
